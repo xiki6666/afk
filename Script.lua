@@ -10,8 +10,7 @@ local teleportPoints = {
     Vector3.new(172.26, 47.47, 426.68),
     Vector3.new(170.43, 3.66, 474.95)
 }
-local isTeleporting = false
-local teleportCycle = false
+local currentTeleportIndex = 1
 
 -- Создание GUI
 local screenGui = Instance.new("ScreenGui")
@@ -28,7 +27,7 @@ local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0, 180, 0, 40)
 toggleButton.Position = UDim2.new(0, 10, 0, 10)
 toggleButton.BackgroundColor3 = Color3.new(0.4, 0.4, 0.8)
-toggleButton.Text = "Запуск цикла ТП"
+toggleButton.Text = "Точка 1 (T)"
 toggleButton.TextScaled = true
 toggleButton.Parent = frame
 
@@ -36,7 +35,7 @@ local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0, 180, 0, 30)
 statusLabel.Position = UDim2.new(0, 10, 0, 50)
 statusLabel.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-statusLabel.Text = "Цикл выключен"
+statusLabel.Text = "Готова к телепортации"
 statusLabel.TextScaled = true
 statusLabel.TextColor3 = Color3.new(1, 1, 1)
 statusLabel.Parent = frame
@@ -57,66 +56,48 @@ local function instantTeleport(targetPosition)
     rootPart.CFrame = CFrame.new(targetPosition)
 end
 
--- Функция циклической телепортации
-local function startTeleportCycle()
-    if isTeleporting then return end
+-- Функция обновления интерфейса
+local function updateUI()
+    toggleButton.Text = "Точка " .. currentTeleportIndex .. " (T)"
+    statusLabel.Text = "Телепорт на точку " .. currentTeleportIndex
+end
+
+-- Обработчик телепортации
+local function onTeleport()
+    instantTeleport(teleportPoints[currentTeleportIndex])
     
-    teleportCycle = not teleportCycle
+    -- Мигающий эффект для обратной связи
+    toggleButton.BackgroundColor3 = Color3.new(0.2, 0.8, 0.2)
+    statusLabel.BackgroundColor3 = Color3.new(0, 0.5, 0)
     
-    if teleportCycle then
-        toggleButton.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
-        toggleButton.Text = "Остановить цикл ТП"
-        statusLabel.Text = "Цикл активен"
-        statusLabel.BackgroundColor3 = Color3.new(0, 0.5, 0)
-        
-        -- Запуск цикла телепортации
-        spawn(function()
-            local currentIndex = 1
-            isTeleporting = true
-            
-            while teleportCycle and character and character:FindFirstChild("HumanoidRootPart") do
-                -- Телепортация на текущую точку
-                instantTeleport(teleportPoints[currentIndex])
-                
-                -- Обновление статуса
-                statusLabel.Text = "Точка " .. currentIndex
-                
-                -- Ожидание 5 секунд
-                for i = 5, 1, -1 do
-                    if not teleportCycle then break end
-                    statusLabel.Text = "Точка " .. currentIndex .. " (" .. i .. ")"
-                    wait(1)
-                end
-                
-                -- Переключение на следующую точку
-                currentIndex = currentIndex % #teleportPoints + 1
-            end
-            
-            isTeleporting = false
-        end)
-    else
+    -- Переключение на следующую точку
+    currentTeleportIndex = currentTeleportIndex % #teleportPoints + 1
+    
+    -- Обновление интерфейса
+    updateUI()
+    
+    -- Возврат к обычному цвету через 0.3 секунды
+    delay(0.3, function()
         toggleButton.BackgroundColor3 = Color3.new(0.4, 0.4, 0.8)
-        toggleButton.Text = "Запуск цикла ТП"
-        statusLabel.Text = "Цикл выключен"
         statusLabel.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
-    end
+        statusLabel.Text = "Готова к телепортации"
+    end)
 end
 
 -- Обработчик смены сервера
 local function onServerSwitch()
-    teleportCycle = false
     TeleportService:Teleport(game.PlaceId, player)
 end
 
 -- Подключение событий
-toggleButton.MouseButton1Click:Connect(startTeleportCycle)
+toggleButton.MouseButton1Click:Connect(onTeleport)
 serverButton.MouseButton1Click:Connect(onServerSwitch)
 
 -- Обработка нажатия клавиши T
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.T then
-        startTeleportCycle()
+        onTeleport()
     end
 end)
 
@@ -124,3 +105,6 @@ end)
 player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
 end)
+
+-- Инициализация интерфейса
+updateUI()
