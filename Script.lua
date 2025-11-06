@@ -1,19 +1,16 @@
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
 
 -- Настройки телепортации
 local teleportPoints = {
-	Vector3.new(109.15, 3.74, 529.22),
-	Vector3.new(170.43, 3.67, 474.95)
+    Vector3.new(109.15, 3.74, 529.22),
+    Vector3.new(170.43, 3.67, 474.95)
 }
 local currentTeleportIndex = 1
-local teleportDuration = 1 -- Длительность твина в секундах
 
 -- Создание GUI
 local screenGui = Instance.new("ScreenGui")
@@ -42,33 +39,23 @@ serverButton.Text = "Другой сервер"
 serverButton.TextScaled = true
 serverButton.Parent = frame
 
--- Функция плавной телепортации
-local function smoothTeleport(targetPosition)
-	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-
-	local rootPart = character.HumanoidRootPart
-	local tweenInfo = TweenInfo.new(
-		teleportDuration,
-		Enum.EasingStyle.Quad,
-		Enum.EasingDirection.Out
-	)
-
-	local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(targetPosition)})
-	humanoid.PlatformStand = true
-	tween:Play()
-	tween.Completed:Wait()
-	humanoid.PlatformStand = false
+-- Функция моментальной телепортации
+local function instantTeleport(targetPosition)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local rootPart = character.HumanoidRootPart
+    rootPart.CFrame = CFrame.new(targetPosition)
 end
 
 -- Обработчик переключения телепорта
 local function onToggleTeleport()
-	currentTeleportIndex = currentTeleportIndex % #teleportPoints + 1
-	smoothTeleport(teleportPoints[currentTeleportIndex])
+    currentTeleportIndex = currentTeleportIndex % #teleportPoints + 1
+    instantTeleport(teleportPoints[currentTeleportIndex])
 end
 
 -- Обработчик смены сервера
 local function onServerSwitch()
-	TeleportService:Teleport(game.PlaceId, player)
+    TeleportService:Teleport(game.PlaceId, player)
 end
 
 -- Подключение событий
@@ -77,14 +64,13 @@ serverButton.MouseButton1Click:Connect(onServerSwitch)
 
 -- Обработка нажатия клавиши T
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.T then
-		onToggleTeleport()
-	end
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        onToggleTeleport()
+    end
 end)
 
 -- Обновление персонажа при респавне
 player.CharacterAdded:Connect(function(newCharacter)
-	character = newCharacter
-	humanoid = newCharacter:WaitForChild("Humanoid")
+    character = newCharacter
 end)
