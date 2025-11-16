@@ -1,144 +1,153 @@
+-- LocalScript в StarterPlayerScripts или StarterGui
 local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
--- Точки телепортации
-local teleportPoints = {
-    Vector3.new(172.26, 47.47, 426.68),
-    Vector3.new(170.43, 3.66, 474.95)
-}
+-- Создаем GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CameraInfoGUI"
+screenGui.Parent = playerGui
 
--- Функция моментальной телепортации
-local function instantTeleport(targetPosition)
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then 
-        return false
-    end
+-- Создаем основной фрейм
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 150)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.new(0, 0, 0)
+frame.BackgroundTransparency = 0.3
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+-- Создаем заголовок (будет использоваться для перетаскивания)
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+title.Text = "Координаты камеры (Нажми T) - Тащи за эту панель"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextScaled = true
+title.Parent = frame
+
+-- Добавляем скругление углов для красоты
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 8)
+titleCorner.Parent = title
+
+-- Создаем текстовые поля для координат
+local positionLabel = Instance.new("TextLabel")
+positionLabel.Size = UDim2.new(1, -10, 0, 30)
+positionLabel.Position = UDim2.new(0, 5, 0, 35)
+positionLabel.BackgroundTransparency = 1
+positionLabel.Text = "Позиция: X: 0, Y: 0, Z: 0"
+positionLabel.TextColor3 = Color3.new(1, 1, 1)
+positionLabel.TextXAlignment = Enum.TextXAlignment.Left
+positionLabel.TextScaled = true
+positionLabel.Parent = frame
+
+local rotationLabel = Instance.new("TextLabel")
+rotationLabel.Size = UDim2.new(1, -10, 0, 30)
+rotationLabel.Position = UDim2.new(0, 5, 0, 70)
+rotationLabel.BackgroundTransparency = 1
+rotationLabel.Text = "Поворот: X: 0, Y: 0, Z: 0"
+rotationLabel.TextColor3 = Color3.new(1, 1, 1)
+rotationLabel.TextXAlignment = Enum.TextXAlignment.Left
+rotationLabel.TextScaled = true
+rotationLabel.Parent = frame
+
+local lookVectorLabel = Instance.new("TextLabel")
+lookVectorLabel.Size = UDim2.new(1, -10, 0, 30)
+lookVectorLabel.Position = UDim2.new(0, 5, 0, 105)
+lookVectorLabel.BackgroundTransparency = 1
+lookVectorLabel.Text = "Направление: X: 0, Y: 0, Z: 0"
+lookVectorLabel.TextColor3 = Color3.new(1, 1, 1)
+lookVectorLabel.TextXAlignment = Enum.TextXAlignment.Left
+lookVectorLabel.TextScaled = true
+lookVectorLabel.Parent = frame
+
+-- Переменные для перетаскивания
+local dragging = false
+local dragInput, dragStart, startPos
+
+-- Функция обновления координат
+local function updateCameraInfo()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
     
-    local rootPart = character.HumanoidRootPart
-    rootPart.CFrame = CFrame.new(targetPosition)
-    return true
+    local position = camera.CFrame.Position
+    local rotation = camera.CFrame - camera.CFrame.Position
+    local lookVector = camera.CFrame.LookVector
+    
+    positionLabel.Text = string.format("Позиция: X: %.2f, Y: %.2f, Z: %.2f", 
+        position.X, position.Y, position.Z)
+    
+    -- Получаем углы Эйлера из CFrame
+    local x, y, z = rotation:ToEulerAnglesXYZ()
+    rotationLabel.Text = string.format("Поворот: X: %.2f, Y: %.2f, Z: %.2f", 
+        math.deg(x), math.deg(y), math.deg(z))
+    
+    lookVectorLabel.Text = string.format("Направление: X: %.2f, Y: %.2f, Z: %.2f", 
+        lookVector.X, lookVector.Y, lookVector.Z)
 end
 
--- Функция проверки достижения точки
-local function isAtPosition(targetPosition, threshold)
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then 
-        return false
-    end
-    
-    local rootPart = character.HumanoidRootPart
-    local distance = (rootPart.Position - targetPosition).Magnitude
-    return distance < threshold
+-- Функции для перетаскивания
+local function update(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
--- Основной процесс автоматической телепортации и перезахода
-local function startAutoTeleportProcess()
-    -- Ждем появления персонажа
-    local character = player.Character or player.CharacterAdded:Wait()
-    
-    -- Небольшая задержка перед началом
-    wait(2)
-    
-    -- Телепортация по всем точкам
-    for index, point in ipairs(teleportPoints) do
-        print("Телепортация на точку " .. index)
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
         
-        -- Пытаемся телепортироваться
-        local success = instantTeleport(point)
+        -- Легкий эффект при захвате
+        local tween = TweenService:Create(title, TweenInfo.new(0.1), {BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)})
+        tween:Play()
         
-        if success then
-            -- Ждем, пока персонаж действительно телепортируется
-            local waitTime = 0
-            local maxWaitTime = 5 -- Максимальное время ожидания в секундах
-            
-            while waitTime < maxWaitTime and not isAtPosition(point, 5) do
-                wait(0.1)
-                waitTime = waitTime + 0.1
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+                -- Возвращаем цвет
+                local tween = TweenService:Create(title, TweenInfo.new(0.1), {BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)})
+                tween:Play()
             end
-            
-            if isAtPosition(point, 5) then
-                print("Успешно телепортирован на точку " .. index)
-            else
-                print("Не удалось подтвердить телепортацию на точку " .. index)
-            end
-            
-            -- Небольшая пауза между телепортациями
-            wait(1)
-        else
-            print("Ошибка телепортации на точку " .. index)
-        end
+        end)
     end
-    
-    -- После завершения всех телепортаций - перезаход
-    print("Завершены все телепортации. Перезаход на сервер...")
-    wait(1)
-    
-    -- Перезаход на другой сервер
-    TeleportService:Teleport(game.PlaceId, player)
-end
-
--- Альтернативный вариант с использованием корутин для более плавного выполнения
-local function startAutoTeleportCoroutine()
-    coroutine.wrap(function()
-        -- Ждем появления персонажа
-        local character = player.Character or player.CharacterAdded:Wait()
-        
-        -- Даем время на загрузку
-        wait(2)
-        
-        -- Последовательно телепортируемся по точкам
-        for i, point in ipairs(teleportPoints) do
-            print("Авто-телепорт на точку " .. i)
-            
-            if instantTeleport(point) then
-                -- Ждем подтверждения телепортации
-                local confirmed = false
-                for _ = 1, 50 do  -- 50 попыток по 0.1 секунды = 5 секунд максимум
-                    wait(0.1)
-                    if isAtPosition(point, 5) then
-                        confirmed = true
-                        break
-                    end
-                end
-                
-                if confirmed then
-                    print("✓ Успешная телепортация на точку " .. i)
-                else
-                    print("✗ Проблема с телепортацией на точку " .. i)
-                end
-                
-                wait(1) -- Пауза перед следующей точкой
-            end
-        end
-        
-        -- После всех точек - автоматический перезаход
-        print("Запуск автоматического перезахода...")
-        wait(2)
-        TeleportService:Teleport(game.PlaceId, player)
-    end)()
-end
-
--- Запускаем процесс когда игрок загрузится
-if player then
-    -- Небольшая задержка перед началом автоматического процесса
-    wait(1)
-    startAutoTeleportCoroutine()
-else
-    Players.PlayerAdded:Connect(function(newPlayer)
-        if newPlayer == player then
-            wait(1)
-            startAutoTeleportCoroutine()
-        end
-    end)
-end
-
--- Обработка респавна персонажа (на случай смерти)
-player.CharacterAdded:Connect(function(character)
-    -- Если процесс уже запущен, не делаем ничего
-    -- Или можно добавить логику перезапуска процесса при необходимости
 end)
 
-print("Автоматическая система телепортации активирована")
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- Обработчик нажатия клавиши T
+local function onInputBegan(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.T then
+        updateCameraInfo()
+    end
+end
+
+-- Подключаем обработчик
+UserInputService.InputBegan:Connect(onInputBegan)
+
+-- Первоначальное обновление
+updateCameraInfo()
+
+print("GUI с координатами камеры создано! Нажмите T для обновления. Тащите за верхнюю панель для перемещения.")
