@@ -14,27 +14,27 @@ screenGui.Parent = playerGui
 
 -- Создаем основной фрейм
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 150)
+frame.Size = UDim2.new(0, 300, 0, 180) -- Увеличили высоту для кнопки
 frame.Position = UDim2.new(0, 10, 0, 10)
 frame.BackgroundColor3 = Color3.new(0, 0, 0)
 frame.BackgroundTransparency = 0.3
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
 
--- Создаем заголовок (будет использоваться для перетаскивания)
+-- Добавляем скругление углов
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = frame
+
+-- Создаем заголовок (для перетаскивания)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.Position = UDim2.new(0, 0, 0, 0)
 title.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
-title.Text = "Координаты камеры (Нажми T) - Тащи за эту панель"
+title.Text = "Координаты камеры (T - обновить)"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.TextScaled = true
 title.Parent = frame
-
--- Добавляем скругление углов для красоты
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
 
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 8)
@@ -71,9 +71,37 @@ lookVectorLabel.TextXAlignment = Enum.TextXAlignment.Left
 lookVectorLabel.TextScaled = true
 lookVectorLabel.Parent = frame
 
+-- Добавляем кнопку для копирования
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0.9, 0, 0, 25)
+copyButton.Position = UDim2.new(0.05, 0, 0, 140)
+copyButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.5)
+copyButton.Text = "Ctrl+C - Скопировать координаты"
+copyButton.TextColor3 = Color3.new(1, 1, 1)
+copyButton.TextScaled = true
+copyButton.Parent = frame
+
+local copyCorner = Instance.new("UICorner")
+copyCorner.CornerRadius = UDim.new(0, 5)
+copyCorner.Parent = copyButton
+
+-- Создаем невидимое TextBox для копирования текста
+local copyTextBox = Instance.new("TextBox")
+copyTextBox.Size = UDim2.new(0, 1, 0, 1)
+copyTextBox.Position = UDim2.new(0, -10, 0, -10)
+copyTextBox.BackgroundTransparency = 1
+copyTextBox.TextTransparency = 1
+copyTextBox.Text = ""
+copyTextBox.Parent = frame
+
 -- Переменные для перетаскивания
 local dragging = false
 local dragInput, dragStart, startPos
+
+-- Текущие значения координат
+local currentPosition = ""
+local currentRotation = ""
+local currentLookVector = ""
 
 -- Функция обновления координат
 local function updateCameraInfo()
@@ -84,16 +112,58 @@ local function updateCameraInfo()
     local rotation = camera.CFrame - camera.CFrame.Position
     local lookVector = camera.CFrame.LookVector
     
-    positionLabel.Text = string.format("Позиция: X: %.2f, Y: %.2f, Z: %.2f", 
+    currentPosition = string.format("Позиция: X: %.2f, Y: %.2f, Z: %.2f", 
         position.X, position.Y, position.Z)
+    positionLabel.Text = currentPosition
     
     -- Получаем углы Эйлера из CFrame
     local x, y, z = rotation:ToEulerAnglesXYZ()
-    rotationLabel.Text = string.format("Поворот: X: %.2f, Y: %.2f, Z: %.2f", 
+    currentRotation = string.format("Поворот: X: %.2f, Y: %.2f, Z: %.2f", 
         math.deg(x), math.deg(y), math.deg(z))
+    rotationLabel.Text = currentRotation
     
-    lookVectorLabel.Text = string.format("Направление: X: %.2f, Y: %.2f, Z: %.2f", 
+    currentLookVector = string.format("Направление: X: %.2f, Y: %.2f, Z: %.2f", 
         lookVector.X, lookVector.Y, lookVector.Z)
+    lookVectorLabel.Text = currentLookVector
+end
+
+-- Функция для копирования координат в буфер обмена
+local function copyToClipboard()
+    local allText = currentPosition .. "\n" .. currentRotation .. "\n" .. currentLookVector
+    
+    -- Устанавливаем текст в TextBox
+    copyTextBox.Text = allText
+    -- Выделяем весь текст
+    copyTextBox:CaptureFocus()
+    copyTextBox.Text = allText -- Устанавливаем текст после получения фокуса
+    wait() -- Ждем один кадр
+    copyTextBox:SelectAll() -- Выделяем весь текст
+    
+    -- Визуальная обратная связь
+    copyButton.BackgroundColor3 = Color3.new(0.2, 0.7, 0.2)
+    copyButton.Text = "Координаты скопированы!"
+    
+    -- Возвращаем исходный вид через 1 секунду
+    delay(1, function()
+        copyButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.5)
+        copyButton.Text = "Ctrl+C - Скопировать координаты"
+    end)
+end
+
+-- Обработчик нажатия кнопки копирования
+copyButton.MouseButton1Click:Connect(copyToClipboard)
+
+-- Обработчик горячих клавиш
+local function onInputBegan(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.T then
+        updateCameraInfo()
+    elseif input.KeyCode == Enum.KeyCode.C and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        copyToClipboard()
+    elseif input.KeyCode == Enum.KeyCode.C and UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+        copyToClipboard()
+    end
 end
 
 -- Функции для перетаскивания
@@ -135,19 +205,13 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Обработчик нажатия клавиши T
-local function onInputBegan(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.T then
-        updateCameraInfo()
-    end
-end
-
--- Подключаем обработчик
+-- Подключаем обработчик горячих клавиш
 UserInputService.InputBegan:Connect(onInputBegan)
 
 -- Первоначальное обновление
 updateCameraInfo()
 
-print("GUI с координатами камеры создано! Нажмите T для обновления. Тащите за верхнюю панель для перемещения.")
+print("GUI с координатами камеры создано!")
+print("Нажмите T для обновления координат")
+print("Нажмите Ctrl+C или кнопку для копирования координат")
+print("Тащите за верхнюю панель для перемещения GUI")
